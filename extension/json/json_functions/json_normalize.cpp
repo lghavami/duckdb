@@ -86,14 +86,16 @@ static void NormalizeFunction(DataChunk &args, ExpressionState &state, Vector &r
 	JSONAllocator::AddBuffer(result, alc);
 }
 
-static void GetNormalizeFunctionInternal(ScalarFunctionSet &set, const LogicalType &json) {
-	set.AddFunction(ScalarFunction("json_normalize", {json}, LogicalType::VARCHAR, NormalizeFunction, nullptr, nullptr,
-	                               JSONFunctionLocalState::Init));
-}
-
 ScalarFunctionSet JSONFunctions::GetNormalizeFunction() {
 	ScalarFunctionSet set("json_normalize");
-	GetNormalizeFunctionInternal(set, LogicalType::JSON());
+
+	ScalarFunction func({}, LogicalType::VARCHAR, NormalizeFunction, nullptr, nullptr, JSONFunctionLocalState::Init);
+
+	func.GetSignature()
+		.AddParameter("value", LogicalType::VARCHAR);
+	
+	set.AddFunction(std::move(func));
+	
 	return set;
 }
 
