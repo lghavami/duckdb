@@ -91,11 +91,10 @@ ScalarFunctionSet JSONFunctions::GetNormalizeFunction() {
 
 	ScalarFunction func({}, LogicalType::VARCHAR, NormalizeFunction, nullptr, nullptr, JSONFunctionLocalState::Init);
 
-	func.GetSignature()
-		.AddParameter("value", LogicalType::VARCHAR);
-	
+	func.GetSignature().AddParameter("value", LogicalType::VARCHAR);
+
 	set.AddFunction(std::move(func));
-	
+
 	return set;
 }
 
