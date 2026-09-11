@@ -118,9 +118,7 @@ if(NOT ${EXT_TEST_PATH_LIST} STREQUAL "")
 endif()
 
 set(GENERATED_CPP_FILE
-    ${PROJECT_BINARY_DIR}/codegen/src/generated_extension_loader.cpp
-        json/json_recursion_stack.cpp
-        json/include/json_recursion_stack.h)
+    ${PROJECT_BINARY_DIR}/codegen/src/generated_extension_loader.cpp)
 configure_file(generated_extension_loader.cpp.in "${GENERATED_CPP_FILE}")
 add_library(duckdb_generated_extension_loader STATIC ${GENERATED_CPP_FILE})
 
