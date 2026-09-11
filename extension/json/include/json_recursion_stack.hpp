@@ -3,11 +3,21 @@
 #include "json_common.hpp"
 
 namespace duckdb {
+template<class STACK_ITEM>
 class JsonRecursionStack {
 public:
-	// template crap here
-
+	void Push(STACK_ITEM item) {
+		stack.push_back(std::move(item));
+	}
+	STACK_ITEM Pop() {
+		STACK_ITEM item = stack.back();
+		stack.pop_back();
+		return item;
+	}
+	bool Empty() const {
+		return stack.empty();
+	}
 private:
-	// even more crap over here
+	vector<STACK_ITEM> stack;
 };
 }
