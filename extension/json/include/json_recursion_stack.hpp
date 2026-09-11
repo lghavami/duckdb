@@ -1,10 +1,9 @@
 #pragma once
-
 #include "json_common.hpp"
 
 namespace duckdb {
 template<class STACK_ITEM>
-class JsonRecursionStack {
+class JSONRecursionStack {
 public:
 	void Push(STACK_ITEM item) {
 		stack.push_back(std::move(item));
