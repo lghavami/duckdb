@@ -22,13 +22,12 @@ static yyjson_mut_val *DeepMerge(yyjson_mut_doc *doc, yyjson_mut_val *orig_root,
 		yyjson_mut_val *patch_node;
 		yyjson_mut_val *builder;
 	};
-	auto stack = std::vector<stack_item>();
-	stack.emplace_back(stack_item {nullptr, orig_root, patch_root, root_builder});
+	auto stack = JSONRecursionStack<stack_item>();
+	stack.Push(stack_item {nullptr, orig_root, patch_root, root_builder});
 
 	// loop over each level of nesting
-	while (!stack.empty()) {
-		auto nodes = stack.back();
-		stack.pop_back();
+	while (!stack.Empty()) {
+		auto nodes = stack.Pop();
 
 		auto builder = nodes.builder;
 
@@ -77,7 +76,7 @@ static yyjson_mut_val *DeepMerge(yyjson_mut_doc *doc, yyjson_mut_val *orig_root,
 				} else {
 					auto child_builder = yyjson_mut_obj(doc);
 					// now we know that both are objects and we need to check them, so we add them to the stack
-					stack.emplace_back(stack_item {mut_key, orig_val, patch_val, child_builder});
+					stack.Push(stack_item {mut_key, orig_val, patch_val, child_builder});
 					yyjson_mut_obj_add(builder, mut_key, child_builder);
 				}
 			}
