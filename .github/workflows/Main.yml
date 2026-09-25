@@ -24,34 +24,9 @@ on:
       - 'feature'
       - 'v*.*-*'
       - 'gh-readonly-queue/**'
-    paths:
-      - '**'
-      - '!**.md'
-      - '!tools/**'
-      - 'tools/shell/**'
-      - '!.github/patches/duckdb-wasm/**'
-      - '!.github/workflows/**'
-      - '.github/workflows/Main.yml'
-      - '.github/workflows/Swift.yml'
-      - '.github/workflows/Windows.yml'
-      - '.github/workflows/Regression.yml'
-      - '.github/workflows/OSX.yml'
   merge_group:
   pull_request:
     types: [opened, reopened, ready_for_review, converted_to_draft, synchronize]
-    paths:
-      - '**'
-      - '!**.md'
-      - '!tools/**'
-      - 'tools/shell/**'
-      - '!.github/patches/duckdb-wasm/**'
-      - '!.github/workflows/**'
-      - '.github/workflows/Main.yml'
-      - '.github/workflows/Swift.yml'
-      - '.github/workflows/Windows.yml'
-      - '.github/workflows/Regression.yml'
-      - '.github/workflows/OSX.yml'
-
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/main' || github.sha }}
@@ -192,6 +167,7 @@ jobs:
           python3 scripts/ci/job_stages.py \
             --event "${{ github.event_name }}" \
             --ref_name "${{ github.ref_name }}" \
+            --default_branch "${{ github.event.repository.default_branch }}" \
             --repository "${{ github.repository }}" \
             --skip-tests "$skip_tests" \
             --changed-keys "${{ steps.changed.outputs.changed_keys }}" \
@@ -304,7 +280,7 @@ jobs:
       with:
         build-type: relassert
         build: python3 scripts/ci/retry.py -- make relassert
-        vcpkg-commit: 84bab45d415d22042bd0b9081aea57f362da3f35
+        vcpkg-commit: cd61e1e26a038e82d6550a3ebbe0fbbfe7da78e3 # Release 2026.06.24
         test: make smoke T="--changed-tests=$RUNNER_TEMP/changed_tests.txt"
         bundle: make relassert-artifact
         upload-name: linux-relassert-build
@@ -455,6 +431,7 @@ jobs:
       ci_tools_version: main
       exclude_archs: ${{ needs.prepare.outputs.extensions_extra_exclude_archs }}
       allow_failure_archs: ${{ needs.prepare.outputs.extension_allow_failure_archs }}
+      vcpkg_commit: cd61e1e26a038e82d6550a3ebbe0fbbfe7da78e3 # Release 2026.06.24
       reduced_ci_mode: ${{ (github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && !inputs.run_all)) && 'enabled' || 'disabled' }}
       skip_tests: ${{ fromJson(needs.prepare.outputs.skip_tests) }}
       save_cache: ${{ fromJson(needs.prepare.outputs.save_cache) }}
@@ -704,25 +681,29 @@ jobs:
         test: ${{ !fromJson(needs.prepare.outputs.skip_tests) && matrix.config.run_smoke && 'make smoke T="--changed-tests=$RUNNER_TEMP/changed_tests.txt"' || 'true' }}
         bundle: make release-artifact
         upload-name: ${{ matrix.config.build_artifact }}
-        vcpkg-commit: 84bab45d415d22042bd0b9081aea57f362da3f35
+        vcpkg-commit: cd61e1e26a038e82d6550a3ebbe0fbbfe7da78e3 # Release 2026.06.24
         cache-suffix: ${{ matrix.config.vcpkg_cache_suffix }}
         save-cache: ${{ matrix.config.save_vcpkg_cache && fromJson(needs.prepare.outputs.save_cache) }}
 
-    - name: Symbol Checks
-      run: make -j4 --output-sync=target symbol-checks
-
-    - name: CLI check
+    - name: Checks
       shell: bash
+      env:
+        TEST_STATIC: ${{ matrix.config.test_static }}
+        TEST_SHARED: ${{ matrix.config.is_canonical_build }}
       run: |
+        echo "::group::Symbol checks"
+        make -j4 --output-sync=target symbol-checks
+        echo "::endgroup::"
+
+        echo "::group::CLI check"
         ./build/release/duckdb -c "PRAGMA platform; PRAGMA version;"
         if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
           # Fail on non-zero major version.
           ./build/release/duckdb -ascii -noheader -c "SELECT library_version FROM pragma_version() WHERE library_version NOT LIKE 'v0%'" | grep '^v'
         fi
+        echo "::endgroup::"
 
-    - name: Verify build flags
-      shell: bash
-      run: |
+        echo "::group::Verify build flags"
         if [[ "${{ matrix.config.arch }}" == "amd64" ]]; then
           grep -Fq -- '-march=x86-64-v3' build/release/compile_commands.json
         else
@@ -737,34 +718,14 @@ jobs:
         else
           grep -Fq -- '-flto=thin' build/release/compile_commands.json
         fi
+        echo "::endgroup::"
 
-    - name: GCC static library compatibility
-      if: ${{ matrix.config.is_compatibility_build }}
-      shell: bash
-      run: |
-        gcc -std=c11 \
-          -Isrc/include \
-          examples/embedded-c/main.c \
-          build/release/src/libduckdb_static.a \
-          build/release/extension/libdummy_static_extension_loader.a \
-          -ldl -lpthread -lm -lstdc++ \
-          -o build/release/gcc-static-library-smoke
-        build/release/gcc-static-library-smoke
-
-    - name: GCC shared library compatibility
-      if: ${{ matrix.config.is_canonical_build }}
-      shell: bash
-      run: |
-        gcc -std=c11 \
-          -Isrc/include \
-          examples/embedded-c/main.c \
-          -Lbuild/release/src \
-          -Wl,-rpath,"$PWD/build/release/src" \
-          -lduckdb \
-          -o build/release/gcc-shared-library-smoke
-        build/release/gcc-shared-library-smoke
+        echo "::group::Link checks"
+        make linux-release-link-checks
+        echo "::endgroup::"
 
     - name: Deploy
+      if: ${{ matrix.config.publish_source || matrix.config.publish_static || matrix.config.is_canonical_build }}
       shell: bash
       env:
         AWS_ENDPOINT_URL: ${{ secrets.S3_DUCKDB_STAGING_ENDPOINT }}
@@ -781,8 +742,7 @@ jobs:
           assets+=(libduckdb-src.zip)
         fi
         if [[ "${{ matrix.config.publish_static }}" == "true" ]]; then
-          make gather-libs
-          make static-libs-release-artifact ARTIFACT_SUFFIX=${{ matrix.config.artifact_suffix }} STATIC_LIBRARIES="build/release/libs/*"
+          make static-libs-release-artifact ARTIFACT_SUFFIX=${{ matrix.config.artifact_suffix }} STATIC_LIBRARIES="build/release/src/libduckdb_static.a build/release/extension/*/lib*_extension.a"
           assets+=(duckdb-static-libs-${{ matrix.config.artifact_suffix }}.tar.gz)
         fi
         if [[ "${{ matrix.config.is_canonical_build }}" == "true" ]]; then
@@ -864,7 +824,7 @@ jobs:
       with:
         build-type: codecov
         build: python3 scripts/ci/retry.py -- make codecov
-        vcpkg-commit: 84bab45d415d22042bd0b9081aea57f362da3f35
+        vcpkg-commit: cd61e1e26a038e82d6550a3ebbe0fbbfe7da78e3 # Release 2026.06.24
         cache-suffix: codecov
         save-cache: ${{ fromJson(needs.prepare.outputs.save_cache) }}
 
@@ -911,7 +871,7 @@ jobs:
         tar -xzf build/release-artifact.tar.gz -C build
 
     - name: Run all release unit tests
-      run: make allunit
+      run: make allunit T="--test-flags='--thread-stack-size 131072'"
 
     - name: Tools Tests
       run: python -m pytest tools/shell/tests --shell-binary build/release/duckdb
@@ -959,7 +919,7 @@ jobs:
         FORCE_WARN_UNUSED: 1
       with:
         build: make
-        vcpkg-commit: 84bab45d415d22042bd0b9081aea57f362da3f35
+        vcpkg-commit: cd61e1e26a038e82d6550a3ebbe0fbbfe7da78e3 # Release 2026.06.24
         cache-suffix: linux-cli-${{ matrix.config.cache_suffix }}
         save-cache: ${{ fromJson(needs.prepare.outputs.save_cache) }}
 
@@ -994,8 +954,7 @@ jobs:
       run: |
         make cli-release-artifact ARTIFACT_SUFFIX=${{ matrix.config.artifact_suffix }} CLI_BINARY=build/release/duckdb
         make shared-libs-release-artifact ARTIFACT_SUFFIX=${{ matrix.config.artifact_suffix }} SHARED_LIBRARIES="build/release/src/libduckdb.so*"
-        make gather-libs
-        make static-libs-release-artifact ARTIFACT_SUFFIX=${{ matrix.config.artifact_suffix }} STATIC_LIBRARIES="build/release/libs/*"
+        make static-libs-release-artifact ARTIFACT_SUFFIX=${{ matrix.config.artifact_suffix }} STATIC_LIBRARIES="build/release/src/libduckdb_static.a build/release/extension/*/lib*_extension.a"
         ./scripts/upload-assets-to-staging.sh github_release \
           duckdb-cli-${{ matrix.config.artifact_suffix }}.tar.gz \
           duckdb-shared-libs-${{ matrix.config.artifact_suffix }}.tar.gz \
@@ -1140,11 +1099,10 @@ jobs:
           DESTROY_UNPINNED_BLOCKS: 1
           ALTERNATIVE_VERIFY: 1
           DISABLE_POINTER_SALT: 1
-          DISABLE_GCC_FUNCTION_SECTIONS: 1
         with:
           build-type: relassert
           build: python3 scripts/ci/retry.py -- make relassert
-          vcpkg-commit: 84bab45d415d22042bd0b9081aea57f362da3f35
+          vcpkg-commit: cd61e1e26a038e82d6550a3ebbe0fbbfe7da78e3 # Release 2026.06.24
           cache-suffix: no_string_inline
           save-cache: ${{ fromJson(needs.prepare.outputs.save_cache) }}
 
@@ -1188,7 +1146,7 @@ jobs:
         with:
           build-type: release
           build: python3 scripts/ci/retry.py -- make release
-          vcpkg-commit: 84bab45d415d22042bd0b9081aea57f362da3f35
+          vcpkg-commit: cd61e1e26a038e82d6550a3ebbe0fbbfe7da78e3 # Release 2026.06.24
           cache-suffix: no_rtti
           save-cache: ${{ fromJson(needs.prepare.outputs.save_cache) }}
 
@@ -1270,7 +1228,7 @@ jobs:
       with:
         build-type: reldebug
         build: python3 scripts/ci/retry.py -- make reldebug
-        vcpkg-commit: 84bab45d415d22042bd0b9081aea57f362da3f35
+        vcpkg-commit: cd61e1e26a038e82d6550a3ebbe0fbbfe7da78e3 # Release 2026.06.24
         cache-suffix: threadsan
         save-cache: ${{ fromJson(needs.prepare.outputs.save_cache) }}
 
