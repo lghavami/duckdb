@@ -2,8 +2,8 @@
 #include "json_common.hpp"
 
 namespace duckdb {
-template<class STACK_ITEM>
-class JSONRecursionStack {
+template<class STACK_ITEM> // preferably a struct
+class Stack {
 public:
 	void Push(STACK_ITEM item) {
 		stack.push_back(std::move(item));
@@ -19,4 +19,10 @@ public:
 private:
 	vector<STACK_ITEM> stack;
 };
+
+template<class RETURN_TYPE, class STACK_ITEM>
+static RETURN_TYPE JSONIterator(std::function<> p) {
+	// some code here
+	// return some RETURN_TYPE object
+}
 }

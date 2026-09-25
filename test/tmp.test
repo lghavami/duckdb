@@ -1,0 +1,5 @@
+# name: test/tmp.test
+
+require json;
+
+statement error
