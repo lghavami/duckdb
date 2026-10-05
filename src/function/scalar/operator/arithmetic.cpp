@@ -19,10 +19,12 @@
 #include "duckdb/common/types/decimal.hpp"
 #include "duckdb/common/types/interval.hpp"
 #include "duckdb/common/types/timestamp.hpp"
+#include "duckdb/execution/expression_executor.hpp"
 #include "duckdb/function/scalar/operators.hpp"
 #include "duckdb/function/scalar/operator_functions.hpp"
 #include "duckdb/function/scalar/string_functions.hpp"
 #include "duckdb/main/client_context.hpp"
+#include "duckdb/planner/expression/bound_constant_expression.hpp"
 #include "duckdb/planner/expression/bound_function_expression.hpp"
 #include "duckdb/storage/statistics/base_statistics.hpp"
 #include "duckdb/storage/statistics/numeric_stats.hpp"
@@ -479,6 +481,25 @@ static void BignumNegate(DataChunk &args, ExpressionState &state, Vector &result
 	});
 }
 
+
+// Fold at bind-time!
+unique_ptr<Expression> AddIntegerExpression(FunctionBindExpressionInput &input) {
+	for (auto &expr : input.children) {
+		if (!expr->IsFoldable()) {
+			return nullptr;
+		}
+	}
+
+	// check for volatility
+	// input.bound_function.GetDefinition()->GetProperties().GetStability() == FunctionStability::VOLATILE;
+
+	//auto new_expr = input.bound_function.GetDefinition()->Bind(input.context, std::move(input.children));
+	auto new_expr = make_uniq<BoundFunctionExpression>(std::move(input.bound_function), std::move(input.children), input.bind_data ? input.bind_data->Copy() : nullptr);
+	auto result = ExpressionExecutor::EvaluateScalar(input.context, *new_expr);
+	return make_uniq<BoundConstantExpression>(result);
+}
+
+
 ScalarFunction AddFunction::GetFunction(const LogicalType &left_type, const LogicalType &right_type) {
 	const auto inc = ArgProperties().StrictlyIncreasing();
 	const auto unset = ArgProperties();
@@ -498,6 +519,7 @@ ScalarFunction AddFunction::GetFunction(const LogicalType &left_type, const Logi
 			                        PropagateNumericStats<TryAddOperator, AddPropagateStatistics, AddOperator>);
 			function.SetFallible();
 			function.SetArgProperties({inc, inc});
+			function.SetBindExpressionCallback(AddIntegerExpression);
 			return function;
 		} else if (left_type.IsFloating()) {
 			ScalarFunction function("+", {left_type, right_type}, left_type,
@@ -696,6 +718,12 @@ ScalarFunctionSet OperatorAddFun::GetFunctions() {
 
 	// we can add lists together
 	add.AddFunction(ListConcatFun::GetFunction());
+
+	// Also we can add literals together - and produce a literal!
+	ScalarFunction func( {LogicalTypeId::INTEGER_LITERAL, LogicalTypeId::INTEGER_LITERAL}, LogicalTypeId::INTEGER_LITERAL, nullptr);
+	func.SetBindExpressionCallback(AddIntegerExpression);
+
+	add.AddFunction(std::move(func));
 
 	// we can add bignums together
 	add.AddFunction(AddFunction::GetFunction(LogicalType::BIGNUM, LogicalType::BIGNUM));
