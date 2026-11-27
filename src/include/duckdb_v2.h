@@ -6405,6 +6405,82 @@ DUCKDB_C_API DUCKDB_V2_ERROR duckdb_v2_token_iterator_destroy(duckdb_v2_token_it
 /* --- Struct definitions for tokenizer --- */
 
 /* ============================================================================
+ * MODULE: window
+ * ============================================================================ */
+
+/* --- Enums for window --- */
+
+/* --- Struct forward declarations for window --- */
+
+/* --- Types for window --- */
+
+//! TODO
+typedef struct _duckdb_v2_window_function {
+	void *internal_ptr;
+} * duckdb_v2_window_function_handle;
+
+/* --- Constants for window --- */
+
+/* --- Function pointer typedefs for window --- */
+
+/* --- Functions for window --- */
+
+#if DUCKDB_V2_API_ALLOW_UNSTABLE
+/*!
+ * TODO
+ *
+ * history:
+ * - unstable: v2.0.0
+ *
+ * @param factory The factory to create the window function through.
+ * @param function TODO
+ * @param err TODO
+ * @return DUCKDB_V2_ERROR
+ */
+DUCKDB_C_API DUCKDB_V2_ERROR duckdb_v2_window_function_create(duckdb_v2_factory_handle factory,
+                                                              duckdb_v2_window_function_handle *function,
+                                                              duckdb_v2_error_info_handle *err);
+#endif
+
+#if DUCKDB_V2_API_ALLOW_UNSTABLE
+/*!
+ * TODO
+ *
+ * history:
+ * - unstable: v2.0.0
+ *
+ * @param function TODO!!
+ * @param name The name to set. Borrowed and copied.
+ * @param name_length The length of `name` in bytes. `name` must be valid UTF-8, need not be null-terminated, and may be
+ * NULL only when this is 0.
+ * @param err Optional. On failure, receives an opaque info handle the caller must destroy via
+ * `duckdb_v2_error_info_destroy()`.
+ * @return DUCKDB_V2_ERROR
+ */
+DUCKDB_C_API DUCKDB_V2_ERROR duckdb_v2_window_function_set_name(duckdb_v2_window_function_handle function,
+                                                                const char *name, idx_t name_length,
+                                                                duckdb_v2_error_info_handle *err);
+#endif
+
+#if DUCKDB_V2_API_ALLOW_UNSTABLE
+/*!
+ * Destroys the window function, releasing its resources.
+ *
+ * Null-safe: passing a null pointer or null handle is a no-op. The handle is set to null on return to prevent
+ * double-destruction. Destroying the handle after registration does not affect the registered function.
+ *
+ * history:
+ * - unstable: v2.0.0
+ *
+ * @param function The function to destroy.
+ * @return DUCKDB_V2_ERROR
+ */
+DUCKDB_C_API DUCKDB_V2_ERROR duckdb_v2_window_function_destroy(duckdb_v2_window_function_handle *function);
+#endif
+
+/* --- Struct definitions for window --- */
+
+/* ============================================================================
  * MODULE: aggregate
  * ============================================================================ */
 

@@ -29,6 +29,7 @@ add_library_unity(
   capi_v2_func_scalar.cpp
   capi_v2_func_signature.cpp
   capi_v2_func_table.cpp
+  capi_v2_func_window.cpp
   capi_v2_identifier.cpp
   capi_v2_instance.cpp
   capi_v2_log_sink.cpp
