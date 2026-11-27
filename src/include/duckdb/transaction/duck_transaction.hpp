@@ -32,6 +32,8 @@ struct CommitInfo {
 	optional_ptr<CommitDropState> drop_state;
 	//! WAL offset covering the commit's flush marker (0 if no WAL was written)
 	idx_t wal_sync_offset = 0;
+	//! Whether the commit left deleted rows in deleted_rows_in_use for cleanup
+	bool has_index_deletes = false;
 };
 
 class DuckTransaction : public Transaction {
@@ -126,6 +128,8 @@ private:
 	UndoBuffer undo_buffer;
 	//! The set of uncommitted appends for the transaction
 	unique_ptr<LocalStorage> storage;
+	//! Guards checkpoint_lock and vacuum_lock (statements of the transaction can run concurrently)
+	mutex lock_keys_lock;
 	//! Lock that prevents checkpoints from starting
 	unique_ptr<StorageLockKey> checkpoint_lock;
 	//! Lock that prevents vacuums from starting
