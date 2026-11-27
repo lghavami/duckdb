@@ -6414,7 +6414,11 @@ DUCKDB_C_API DUCKDB_V2_ERROR duckdb_v2_token_iterator_destroy(duckdb_v2_token_it
 
 /* --- Types for window --- */
 
-//! TODO
+/*!
+ * An owned opaque handle to a custom window function being built. Created with `duckdb_v2_window_function_create()`,
+ * configured with the setter functions (e.g. `duckdb_v2_window_function_set_name()`), and destroyed with
+ * `duckdb_v2_window_function_destroy()`.
+ */
 typedef struct _duckdb_v2_window_function {
 	void *internal_ptr;
 } * duckdb_v2_window_function_handle;
@@ -6427,14 +6431,18 @@ typedef struct _duckdb_v2_window_function {
 
 #if DUCKDB_V2_API_ALLOW_UNSTABLE
 /*!
- * TODO
+ * Creates a new window function through a factory.
+ *
+ * The function starts out empty: configure it with the setter functions (e.g. `duckdb_v2_window_function_set_name()`).
+ * The caller owns the returned handle and must destroy it with `duckdb_v2_window_function_destroy()`.
  *
  * history:
  * - unstable: v2.0.0
  *
  * @param factory The factory to create the window function through.
- * @param function TODO
- * @param err TODO
+ * @param function On success, receives the newly created window function. Owned by the caller.
+ * @param err Optional. On failure, receives an opaque info handle the caller must destroy via
+ * `duckdb_v2_error_info_destroy()`.
  * @return DUCKDB_V2_ERROR
  */
 DUCKDB_C_API DUCKDB_V2_ERROR duckdb_v2_window_function_create(duckdb_v2_factory_handle factory,
@@ -6444,12 +6452,14 @@ DUCKDB_C_API DUCKDB_V2_ERROR duckdb_v2_window_function_create(duckdb_v2_factory_
 
 #if DUCKDB_V2_API_ALLOW_UNSTABLE
 /*!
- * TODO
+ * Sets the name of the window function.
+ *
+ * The name is borrowed and copied. Calling this again replaces the previous name.
  *
  * history:
  * - unstable: v2.0.0
  *
- * @param function TODO!!
+ * @param function The function to set the name of.
  * @param name The name to set. Borrowed and copied.
  * @param name_length The length of `name` in bytes. `name` must be valid UTF-8, need not be null-terminated, and may be
  * NULL only when this is 0.

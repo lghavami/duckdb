@@ -4,7 +4,10 @@ module: window
 #-----------------------------------------------------------------------------------------------------------------------
 handles:
   window_function:
-    description: TODO
+    description: |
+      An owned opaque handle to a custom window function being built. Created with `[[window_function_create]]`,
+      configured with the setter functions (e.g. `[[window_function_set_name]]`), and destroyed with
+      `[[window_function_destroy]]`.
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Functions
@@ -15,8 +18,12 @@ functions:
   #---------------------------------------------------------------------------------------------------------------------
   window_function_create:
     lifecycle:
-      - [ "unstable", "v2.0.0", "2026-11-25"]
-    description: TODO
+      - [ "unstable", "v2.0.0", "2026-11-25" ]
+    description: |
+      Creates a new window function through a factory.
+
+      The function starts out empty: configure it with the setter functions (e.g. `[[window_function_set_name]]`).
+      The caller owns the returned handle and must destroy it with `[[window_function_destroy]]`.
 
     parameters:
       factory:
@@ -26,11 +33,11 @@ functions:
         type: window_function
         indirection: 1
         kind: OUT
-        description: TODO
+        description: On success, receives the newly created window function. Owned by the caller.
       err:
         type: error_info
         indirection: 1
-        description: TODO
+        description: Optional. On failure, receives an opaque info handle the caller must destroy via `[[error_info_destroy]]`.
     return_type: ERROR
 
   #---------------------------------------------------------------------------------------------------------------------
@@ -39,12 +46,14 @@ functions:
   window_function_set_name:
     lifecycle:
       - [ "unstable", "v2.0.0", "2026-11-25" ]
-    description: TODO
+    description: |
+      Sets the name of the window function.
 
+      The name is borrowed and copied. Calling this again replaces the previous name.
     parameters:
       function:
         type: window_function
-        description: TODO!!
+        description: The function to set the name of.
       name:
         type: char
         indirection: 1
